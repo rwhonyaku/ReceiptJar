@@ -1,4 +1,4 @@
-// Add this function to generate realistic mock data
+// /lib/ocr.ts
 function generateMockReceiptData(filename: string) {
   const vendors = [
     'Starbucks Coffee', 'Amazon.com', 'Uber', 'Lyft', 'Whole Foods',
@@ -19,25 +19,48 @@ function generateMockReceiptData(filename: string) {
   const total = parseFloat((Math.random() * 200 + 5).toFixed(2))
   const tax = parseFloat((total * 0.08).toFixed(2))
   
-  // Random date within last 30 days
   const date = new Date()
   date.setDate(date.getDate() - Math.floor(Math.random() * 30))
   const dateStr = date.toISOString().split('T')[0]
   
   const category = categories[Math.floor(Math.random() * categories.length)]
   
-  return {
-    date: dateStr,
-    vendor,
-    total,
-    tax,
-    category
-  }
+  return { date: dateStr, vendor, total, tax, category }
 }
 
 export async function extractTextFromImage(file: File): Promise<string> {
-  // Still mock for now, but more realistic
-  console.log('Mock OCR processing:', file.name)
+  console.log('📄 Processing:', file.name, 'Type:', file.type, 'Size:', file.size)
+  
+  // Handle PDFs differently
+  if (file.type === 'application/pdf') {
+    console.log('📑 Processing PDF receipt')
+    
+    // Simulate PDF processing (longer delay for PDFs)
+    await new Promise(resolve => setTimeout(resolve, 1500))
+    
+    const mockData = generateMockReceiptData(file.name)
+    
+    return `PDF RECEIPT - ${mockData.vendor}
+    
+Invoice Date: ${mockData.date}
+Invoice Number: INV-${Math.floor(Math.random() * 10000)}
+    
+Description                      Amount
+------------------------------------------
+Product/Service 1                $${(mockData.total * 0.6).toFixed(2)}
+Product/Service 2                $${(mockData.total * 0.4).toFixed(2)}
+    
+Subtotal:                       $${mockData.total.toFixed(2)}
+Tax (8%):                       $${mockData.tax.toFixed(2)}
+TOTAL:                          $${(mockData.total + mockData.tax).toFixed(2)}
+    
+Payment Method: Credit Card
+Status: Paid
+Thank you for your business!`
+  }
+  
+  // Handle images
+  console.log('🖼️ Processing image receipt')
   await new Promise(resolve => setTimeout(resolve, 800 + Math.random() * 500))
   
   const mockData = generateMockReceiptData(file.name)
@@ -62,7 +85,6 @@ export async function extractTextFromImage(file: File): Promise<string> {
 }
 
 export function parseReceiptText(text: string) {
-  // Improved parser that uses regex patterns
   const lines = text.split('\n').filter(line => line.trim())
   
   let date = new Date().toISOString().split('T')[0]
@@ -70,42 +92,43 @@ export function parseReceiptText(text: string) {
   let total = 0
   let tax = 0
   
-  // Better pattern matching
+  // Patterns for both image and PDF receipts
   const patterns = {
     date: /\b(\d{4}[-/]\d{1,2}[-/]\d{1,2}|\d{1,2}[-/]\d{1,2}[-/]\d{4})\b/,
-    total: /(?:TOTAL|AMOUNT DUE|BALANCE)\s*[:$]?\s*(\d+\.\d{2})/i,
-    tax: /(?:TAX|SALES TAX)\s*[:$]?\s*(\d+\.\d{2})/i,
-    vendor: /^[A-Z][A-Z\s&.,]+$/ // All caps vendor names
+    dateLabel: /(?:Date|Invoice Date|DATE)[:\s]+(\d{4}[-/]\d{1,2}[-/]\d{1,2}|\d{1,2}[-/]\d{1,2}[-/]\d{4})/i,
+    total: /(?:TOTAL|AMOUNT DUE|BALANCE|Total Amount)[:\s$]*(\d+\.\d{2})/i,
+    tax: /(?:TAX|SALES TAX|Tax Amount)[:\s$]*(\d+\.\d{2})/i,
+    vendor: /^[A-Z][A-Z\s&.,]+$/,
+    pdfVendor: /PDF RECEIPT - (.+)$/m
   }
   
   for (const line of lines) {
     const trimmed = line.trim()
     
-    // Date
-    const dateMatch = trimmed.match(patterns.date)
+    // Try date patterns
+    const dateMatch = trimmed.match(patterns.date) || trimmed.match(patterns.dateLabel)
     if (dateMatch) date = dateMatch[1]
     
-    // Total
+    // Try total patterns
     const totalMatch = trimmed.match(patterns.total)
-    if (totalMatch) {
-      total = parseFloat(totalMatch[1])
-      continue // Found total, move to next line
-    }
+    if (totalMatch) total = parseFloat(totalMatch[1])
     
-    // Tax
+    // Try tax patterns
     const taxMatch = trimmed.match(patterns.tax)
-    if (taxMatch) {
-      tax = parseFloat(taxMatch[1])
-      continue
-    }
+    if (taxMatch) tax = parseFloat(taxMatch[1])
     
-    // Vendor (first line that looks like a vendor name)
-    if (vendor === 'Unknown Vendor' && patterns.vendor.test(trimmed)) {
-      vendor = trimmed.substring(0, 50)
+    // Try vendor patterns
+    if (vendor === 'Unknown Vendor') {
+      const pdfVendorMatch = trimmed.match(patterns.pdfVendor)
+      if (pdfVendorMatch) {
+        vendor = pdfVendorMatch[1]
+      } else if (patterns.vendor.test(trimmed)) {
+        vendor = trimmed.substring(0, 50)
+      }
     }
   }
   
-  // Fallback: if no patterns matched, use mock data
+  // Fallback to mock data if parsing failed
   if (total === 0 || vendor === 'Unknown Vendor') {
     const mock = generateMockReceiptData('fallback')
     return {

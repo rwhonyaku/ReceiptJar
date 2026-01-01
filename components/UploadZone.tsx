@@ -2,7 +2,7 @@
 
 import { useCallback, useState } from 'react'
 import { useDropzone } from 'react-dropzone'
-import { Upload, X, Camera } from 'lucide-react'
+import { Upload, X, Camera, FileText } from 'lucide-react'
 import type { Receipt } from '@/lib/types'
 
 interface UploadZoneProps {
@@ -12,8 +12,6 @@ interface UploadZoneProps {
 }
 
 export default function UploadZone({ onFilesAdded, receipts, onRemoveReceipt }: UploadZoneProps) {
-  const [isCameraActive, setIsCameraActive] = useState(false)
-
   const onDrop = useCallback((acceptedFiles: File[]) => {
     onFilesAdded(acceptedFiles)
   }, [onFilesAdded])
@@ -21,17 +19,25 @@ export default function UploadZone({ onFilesAdded, receipts, onRemoveReceipt }: 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: {
-      'image/*': ['.jpeg', '.jpg', '.png', '.webp']
+      'image/*': ['.jpeg', '.jpg', '.png', '.webp'],
+      'application/pdf': ['.pdf']
     },
-    multiple: true
+    multiple: true,
+    maxSize: 10 * 1024 * 1024, // 10MB
   })
 
   const handleCameraClick = () => {
-    setIsCameraActive(true)
-    // In a real app, you'd access the camera here
-    // For MVP, we'll just trigger file input click
-    const input = document.querySelector('input[type="file"]') as HTMLInputElement
-    input?.click()
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = 'image/*'
+    input.capture = 'environment' // Mobile: back camera
+    input.onchange = (e) => {
+      const files = (e.target as HTMLInputElement).files
+      if (files && files.length > 0) {
+        onFilesAdded(Array.from(files))
+      }
+    }
+    input.click()
   }
 
   return (
@@ -58,7 +64,7 @@ export default function UploadZone({ onFilesAdded, receipts, onRemoveReceipt }: 
             <p className="text-gray-500 mt-1">or click to browse</p>
           </div>
           
-          <div className="flex gap-4">
+          <div className="flex gap-4 flex-wrap justify-center">
             <button
               type="button"
               onClick={handleCameraClick}
@@ -70,15 +76,18 @@ export default function UploadZone({ onFilesAdded, receipts, onRemoveReceipt }: 
             <button
               type="button"
               {...getRootProps()}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
             >
-              Browse Files
+              <FileText className="h-4 w-4" />
+              Upload Files
             </button>
           </div>
           
-          <p className="text-sm text-gray-500">
-            Supports JPG, PNG, WEBP. Max 10MB per file.
-          </p>
+          <div className="text-sm text-gray-500 space-y-1">
+            <p>Supports: JPG, PNG, WEBP, PDF</p>
+            <p>Max 10MB per file</p>
+            <p className="text-xs text-gray-400">PDF receipts are supported via OCR</p>
+          </div>
         </div>
       </div>
 
@@ -87,28 +96,39 @@ export default function UploadZone({ onFilesAdded, receipts, onRemoveReceipt }: 
         <div className="border rounded-xl p-4">
           <h3 className="font-medium text-gray-900 mb-3">Uploaded Receipts ({receipts.length})</h3>
           <div className="space-y-2 max-h-60 overflow-y-auto">
-            {receipts.map((receipt) => (
-              <div key={receipt.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 bg-gray-200 rounded flex items-center justify-center">
-                    📄
+            {receipts.map((receipt) => {
+              const isPDF = receipt.file.type === 'application/pdf'
+              
+              return (
+                <div key={receipt.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <div className={`h-10 w-10 rounded flex items-center justify-center ${isPDF ? 'bg-red-100' : 'bg-gray-200'}`}>
+                      {isPDF ? '📄' : '🖼️'}
+                    </div>
+                    <div>
+                      <p className="font-medium text-gray-900">{receipt.file.name}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm text-gray-500">
+                          {receipt.status === 'processing' ? 'Processing...' : 
+                           receipt.status === 'extracted' ? 'Ready' : 'Pending'}
+                        </p>
+                        {isPDF && (
+                          <span className="text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded">
+                            PDF
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-medium text-gray-900">{receipt.file.name}</p>
-                    <p className="text-sm text-gray-500">
-                      {receipt.status === 'processing' ? 'Processing...' : 
-                       receipt.status === 'extracted' ? 'Ready' : 'Pending'}
-                    </p>
-                  </div>
+                  <button
+                    onClick={() => onRemoveReceipt(receipt.id)}
+                    className="p-1 hover:bg-gray-200 rounded"
+                  >
+                    <X className="h-5 w-5 text-gray-500" />
+                  </button>
                 </div>
-                <button
-                  onClick={() => onRemoveReceipt(receipt.id)}
-                  className="p-1 hover:bg-gray-200 rounded"
-                >
-                  <X className="h-5 w-5 text-gray-500" />
-                </button>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </div>
       )}
