@@ -13,29 +13,47 @@ interface ReceiptTableProps {
 
 export default function ReceiptTable({ receipts, onUpdateReceipt, onBatchCategoryUpdate }: ReceiptTableProps) {
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [editingField, setEditingField] = useState<keyof Receipt['extractedData'] | null>(null)
+  const [editingField, setEditingField] = useState<string | null>(null)
   const [batchCategory, setBatchCategory] = useState<Category>('Other')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
 
   const readyReceipts = receipts.filter(r => r.extractedData)
 
-  const handleEdit = (id: string, field: keyof Receipt['extractedData']) => {
+  const handleEdit = (id: string, field: string) => {
     setEditingId(id)
     setEditingField(field)
   }
 
-  const handleSave = (id: string, field: keyof Receipt['extractedData'], value: string) => {
+  const handleSave = (id: string, field: string, value: string) => {
     const updates: Partial<Receipt['extractedData']> = {}
     
     if (field === 'date' || field === 'vendor' || field === 'category') {
-      updates[field] = value
+      updates[field as 'date' | 'vendor' | 'category'] = value
     } else if (field === 'total' || field === 'tax') {
-      updates[field] = parseFloat(value) || 0
+      updates[field as 'total' | 'tax'] = parseFloat(value) || 0
     }
     
     onUpdateReceipt(id, updates)
     setEditingId(null)
     setEditingField(null)
+  }
+
+  // For input blur events
+  const handleInputBlur = (
+    id: string, 
+    field: string, 
+    e: React.FocusEvent<HTMLInputElement>
+  ) => {
+    handleSave(id, field, e.target.value)
+  }
+
+  // For select change events
+  const handleSelectChange = (
+    id: string, 
+    field: string, 
+    e: React.ChangeEvent<HTMLSelectElement>
+  ) => {
+    handleSave(id, field, e.target.value)
   }
 
   const toggleSelect = (id: string) => {
@@ -174,195 +192,199 @@ export default function ReceiptTable({ receipts, onUpdateReceipt, onBatchCategor
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200 bg-white">
-            {readyReceipts.map((receipt) => (
-              <tr key={receipt.id} className="hover:bg-gray-50">
-                {/* Select Checkbox */}
-                <td className="px-4 py-3">
-                  <input
-                    type="checkbox"
-                    checked={selectedIds.has(receipt.id)}
-                    onChange={() => toggleSelect(receipt.id)}
-                    className="h-4 w-4 rounded border-gray-300"
-                  />
-                </td>
+            {readyReceipts.map((receipt) => {
+              const extractedData = receipt.extractedData!
+              
+              return (
+                <tr key={receipt.id} className="hover:bg-gray-50">
+                  {/* Select Checkbox */}
+                  <td className="px-4 py-3">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(receipt.id)}
+                      onChange={() => toggleSelect(receipt.id)}
+                      className="h-4 w-4 rounded border-gray-300"
+                    />
+                  </td>
 
-                {/* Date */}
-                <td className="px-4 py-3">
-                  {editingId === receipt.id && editingField === 'date' ? (
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="date"
-                        defaultValue={receipt.extractedData!.date}
-                        onBlur={(e) => handleSave(receipt.id, 'date', e.target.value)}
-                        className="border rounded px-2 py-1 text-sm w-32"
-                        autoFocus
-                      />
-                      <button
-                        onClick={() => setEditingId(null)}
-                        className="p-1 hover:bg-gray-200 rounded"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2">
-                      <span>{receipt.extractedData!.date}</span>
-                      <button
-                        onClick={() => handleEdit(receipt.id, 'date')}
-                        className="p-1 hover:bg-gray-200 rounded opacity-0 group-hover:opacity-100 transition"
-                      >
-                        <Edit2 className="h-3 w-3" />
-                      </button>
-                    </div>
-                  )}
-                </td>
+                  {/* Date */}
+                  <td className="px-4 py-3">
+                    {editingId === receipt.id && editingField === 'date' ? (
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="date"
+                          defaultValue={extractedData.date}
+                          onBlur={(e) => handleInputBlur(receipt.id, 'date', e)}
+                          className="border rounded px-2 py-1 text-sm w-32"
+                          autoFocus
+                        />
+                        <button
+                          onClick={() => setEditingId(null)}
+                          className="p-1 hover:bg-gray-200 rounded"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <span>{extractedData.date}</span>
+                        <button
+                          onClick={() => handleEdit(receipt.id, 'date')}
+                          className="p-1 hover:bg-gray-200 rounded opacity-0 group-hover:opacity-100 transition"
+                        >
+                          <Edit2 className="h-3 w-3" />
+                        </button>
+                      </div>
+                    )}
+                  </td>
 
-                {/* Vendor */}
-                <td className="px-4 py-3">
-                  {editingId === receipt.id && editingField === 'vendor' ? (
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="text"
-                        defaultValue={receipt.extractedData!.vendor}
-                        onBlur={(e) => handleSave(receipt.id, 'vendor', e.target.value)}
-                        className="border rounded px-2 py-1 text-sm w-48"
-                        autoFocus
-                      />
-                      <button
-                        onClick={() => setEditingId(null)}
-                        className="p-1 hover:bg-gray-200 rounded"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2">
-                      <span className="truncate max-w-[200px]">{receipt.extractedData!.vendor}</span>
-                      <button
-                        onClick={() => handleEdit(receipt.id, 'vendor')}
-                        className="p-1 hover:bg-gray-200 rounded opacity-0 group-hover:opacity-100 transition"
-                      >
-                        <Edit2 className="h-3 w-3" />
-                      </button>
-                    </div>
-                  )}
-                </td>
+                  {/* Vendor */}
+                  <td className="px-4 py-3">
+                    {editingId === receipt.id && editingField === 'vendor' ? (
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          defaultValue={extractedData.vendor}
+                          onBlur={(e) => handleInputBlur(receipt.id, 'vendor', e)}
+                          className="border rounded px-2 py-1 text-sm w-48"
+                          autoFocus
+                        />
+                        <button
+                          onClick={() => setEditingId(null)}
+                          className="p-1 hover:bg-gray-200 rounded"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <span className="truncate max-w-[200px]">{extractedData.vendor}</span>
+                        <button
+                          onClick={() => handleEdit(receipt.id, 'vendor')}
+                          className="p-1 hover:bg-gray-200 rounded opacity-0 group-hover:opacity-100 transition"
+                        >
+                          <Edit2 className="h-3 w-3" />
+                        </button>
+                      </div>
+                    )}
+                  </td>
 
-                {/* Total */}
-                <td className="px-4 py-3">
-                  {editingId === receipt.id && editingField === 'total' ? (
-                    <div className="flex items-center gap-2">
-                      <span className="text-gray-500">$</span>
-                      <input
-                        type="number"
-                        step="0.01"
-                        defaultValue={receipt.extractedData!.total}
-                        onBlur={(e) => handleSave(receipt.id, 'total', e.target.value)}
-                        className="border rounded px-2 py-1 text-sm w-24"
-                        autoFocus
-                      />
-                      <button
-                        onClick={() => setEditingId(null)}
-                        className="p-1 hover:bg-gray-200 rounded"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2">
-                      <span>{formatCurrency(receipt.extractedData!.total)}</span>
-                      <button
-                        onClick={() => handleEdit(receipt.id, 'total')}
-                        className="p-1 hover:bg-gray-200 rounded opacity-0 group-hover:opacity-100 transition"
-                      >
-                        <Edit2 className="h-3 w-3" />
-                      </button>
-                    </div>
-                  )}
-                </td>
+                  {/* Total */}
+                  <td className="px-4 py-3">
+                    {editingId === receipt.id && editingField === 'total' ? (
+                      <div className="flex items-center gap-2">
+                        <span className="text-gray-500">$</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          defaultValue={extractedData.total}
+                          onBlur={(e) => handleInputBlur(receipt.id, 'total', e)}
+                          className="border rounded px-2 py-1 text-sm w-24"
+                          autoFocus
+                        />
+                        <button
+                          onClick={() => setEditingId(null)}
+                          className="p-1 hover:bg-gray-200 rounded"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <span>{formatCurrency(extractedData.total)}</span>
+                        <button
+                          onClick={() => handleEdit(receipt.id, 'total')}
+                          className="p-1 hover:bg-gray-200 rounded opacity-0 group-hover:opacity-100 transition"
+                        >
+                          <Edit2 className="h-3 w-3" />
+                        </button>
+                      </div>
+                    )}
+                  </td>
 
-                {/* Tax */}
-                <td className="px-4 py-3">
-                  {editingId === receipt.id && editingField === 'tax' ? (
-                    <div className="flex items-center gap-2">
-                      <span className="text-gray-500">$</span>
-                      <input
-                        type="number"
-                        step="0.01"
-                        defaultValue={receipt.extractedData!.tax}
-                        onBlur={(e) => handleSave(receipt.id, 'tax', e.target.value)}
-                        className="border rounded px-2 py-1 text-sm w-24"
-                        autoFocus
-                      />
-                      <button
-                        onClick={() => setEditingId(null)}
-                        className="p-1 hover:bg-gray-200 rounded"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2">
-                      <span>{formatCurrency(receipt.extractedData!.tax)}</span>
-                      <button
-                        onClick={() => handleEdit(receipt.id, 'tax')}
-                        className="p-1 hover:bg-gray-200 rounded opacity-0 group-hover:opacity-100 transition"
-                      >
-                        <Edit2 className="h-3 w-3" />
-                      </button>
-                    </div>
-                  )}
-                </td>
+                  {/* Tax */}
+                  <td className="px-4 py-3">
+                    {editingId === receipt.id && editingField === 'tax' ? (
+                      <div className="flex items-center gap-2">
+                        <span className="text-gray-500">$</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          defaultValue={extractedData.tax}
+                          onBlur={(e) => handleInputBlur(receipt.id, 'tax', e)}
+                          className="border rounded px-2 py-1 text-sm w-24"
+                          autoFocus
+                        />
+                        <button
+                          onClick={() => setEditingId(null)}
+                          className="p-1 hover:bg-gray-200 rounded"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <span>{formatCurrency(extractedData.tax)}</span>
+                        <button
+                          onClick={() => handleEdit(receipt.id, 'tax')}
+                          className="p-1 hover:bg-gray-200 rounded opacity-0 group-hover:opacity-100 transition"
+                        >
+                          <Edit2 className="h-3 w-3" />
+                        </button>
+                      </div>
+                    )}
+                  </td>
 
-                {/* Category */}
-                <td className="px-4 py-3">
-                  {editingId === receipt.id && editingField === 'category' ? (
-                    <div className="flex items-center gap-2">
-                      <select
-                        defaultValue={receipt.extractedData!.category}
-                        onChange={(e) => handleSave(receipt.id, 'category', e.target.value)}
-                        className="border rounded px-2 py-1 text-sm"
-                        autoFocus
-                      >
-                        {CATEGORIES.map(cat => (
-                          <option key={cat} value={cat}>{cat}</option>
-                        ))}
-                      </select>
-                      <button
-                        onClick={() => setEditingId(null)}
-                        className="p-1 hover:bg-gray-200 rounded"
-                      >
-                        <Check className="h-3 w-3" />
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2">
-                      <span>{receipt.extractedData!.category}</span>
-                      <button
-                        onClick={() => handleEdit(receipt.id, 'category')}
-                        className="p-1 hover:bg-gray-200 rounded opacity-0 group-hover:opacity-100 transition"
-                      >
-                        <Edit2 className="h-3 w-3" />
-                      </button>
-                    </div>
-                  )}
-                </td>
+                  {/* Category */}
+                  <td className="px-4 py-3">
+                    {editingId === receipt.id && editingField === 'category' ? (
+                      <div className="flex items-center gap-2">
+                        <select
+                          defaultValue={extractedData.category}
+                          onChange={(e) => handleSelectChange(receipt.id, 'category', e)}
+                          className="border rounded px-2 py-1 text-sm"
+                          autoFocus
+                        >
+                          {CATEGORIES.map(cat => (
+                            <option key={cat} value={cat}>{cat}</option>
+                          ))}
+                        </select>
+                        <button
+                          onClick={() => setEditingId(null)}
+                          className="p-1 hover:bg-gray-200 rounded"
+                        >
+                          <Check className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <span>{extractedData.category}</span>
+                        <button
+                          onClick={() => handleEdit(receipt.id, 'category')}
+                          className="p-1 hover:bg-gray-200 rounded opacity-0 group-hover:opacity-100 transition"
+                        >
+                          <Edit2 className="h-3 w-3" />
+                        </button>
+                      </div>
+                    )}
+                  </td>
 
-                {/* Actions */}
-                <td className="px-4 py-3">
-                  <button
-                    onClick={() => {
-                      const fields: Array<keyof Receipt['extractedData']> = ['date', 'vendor', 'total', 'tax', 'category']
-                      const nextField = fields[(fields.indexOf(editingField || 'date') + 1) % fields.length]
-                      handleEdit(receipt.id, nextField)
-                    }}
-                    className="text-sm text-blue-600 hover:text-blue-800"
-                  >
-                    Quick Edit
-                  </button>
-                </td>
-              </tr>
-            ))}
+                  {/* Actions */}
+                  <td className="px-4 py-3">
+                    <button
+                      onClick={() => {
+                        const fields = ['date', 'vendor', 'total', 'tax', 'category']
+                        const nextField = fields[(fields.indexOf(editingField || 'date') + 1) % fields.length]
+                        handleEdit(receipt.id, nextField)
+                      }}
+                      className="text-sm text-blue-600 hover:text-blue-800"
+                    >
+                      Quick Edit
+                    </button>
+                  </td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>
